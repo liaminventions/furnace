@@ -22,7 +22,7 @@
 
 #include "../dispatch.h"
 #include "../waveSynth.h"
-#include <queue>
+#include "../../fixedQueue.h"
 #include "sound/snes/SPC_DSP.h"
 
 class DivPlatformSNES: public DivDispatch {
@@ -81,9 +81,10 @@ class DivPlatformSNES: public DivDispatch {
   struct QueuedWrite {
     unsigned char addr;
     unsigned char val;
+    QueuedWrite(): addr(0), val(0) {}
     QueuedWrite(unsigned char a, unsigned char v): addr(a), val(v) {}
   };
-  std::queue<QueuedWrite> writes;
+  FixedQueue<QueuedWrite,256> writes;
 
   signed char sampleMem[65536];
   signed char copyOfSampleMem[65536];
@@ -99,6 +100,8 @@ class DivPlatformSNES: public DivDispatch {
     int dispatch(DivCommand c);
     void* getChanState(int chan);
     DivMacroInt* getChanMacroInt(int ch);
+    unsigned short getPan(int chan);
+    DivChannelPair getPaired(int chan);
     DivSamplePos getSamplePos(int ch);
     DivDispatchOscBuffer* getOscBuffer(int chan);
     unsigned char* getRegisterPool();

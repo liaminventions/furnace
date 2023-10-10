@@ -22,7 +22,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <vector>
+#include "../pch.h"
 #include "config.h"
 #include "chipUtils.h"
 
@@ -173,16 +173,16 @@ enum DivDispatchCmds {
 
   DIV_CMD_N163_WAVE_POSITION,
   DIV_CMD_N163_WAVE_LENGTH,
-  DIV_CMD_N163_WAVE_MODE,
-  DIV_CMD_N163_WAVE_LOAD,
+  DIV_CMD_N163_WAVE_UNUSED1,
+  DIV_CMD_N163_WAVE_UNUSED2,
   DIV_CMD_N163_WAVE_LOADPOS,
   DIV_CMD_N163_WAVE_LOADLEN,
-  DIV_CMD_N163_WAVE_LOADMODE,
+  DIV_CMD_N163_WAVE_UNUSED3,
   DIV_CMD_N163_CHANNEL_LIMIT,
   DIV_CMD_N163_GLOBAL_WAVE_LOAD,
   DIV_CMD_N163_GLOBAL_WAVE_LOADPOS,
-  DIV_CMD_N163_GLOBAL_WAVE_LOADLEN,
-  DIV_CMD_N163_GLOBAL_WAVE_LOADMODE,
+  DIV_CMD_N163_UNUSED4,
+  DIV_CMD_N163_UNUSED5,
 
   DIV_CMD_SU_SWEEP_PERIOD_LOW, // (which, val)
   DIV_CMD_SU_SWEEP_PERIOD_HIGH, // (which, val)
@@ -236,6 +236,8 @@ enum DivDispatchCmds {
 
   DIV_CMD_NES_LINEAR_LENGTH,
 
+  DIV_CMD_EXTERNAL, // (value)
+
   DIV_ALWAYS_SET_VOLUME, // () -> alwaysSetVol
 
   DIV_CMD_MAX
@@ -286,10 +288,15 @@ struct DivRegWrite {
    *   - x is the instance ID
    * - 0xffffxx04: switch sample bank
    *   - for use in VGM export
+   * - 0xffffxx05: set sample position
+   *   - xx is the instance ID
+   *   - data is the sample position
    * - 0xffffffff: reset
    */
   unsigned int addr;
   unsigned int val;
+  DivRegWrite():
+    addr(0), val(0) {}
   DivRegWrite(unsigned int a, unsigned int v):
     addr(a), val(v) {}
 };
@@ -330,6 +337,40 @@ struct DivDispatchOscBuffer {
     followNeedle(0) {
     memset(data,0,65536*sizeof(short));
   }
+};
+
+struct DivChannelPair {
+  const char* label;
+  // -1: none
+  signed char pairs[8];
+
+  DivChannelPair(const char* l, signed char p0, signed char p1, signed char p2, signed char p3, signed char p4, signed char p5, signed char p6, signed char p7):
+    label(l),
+    pairs{p0,p1,p2,p3,p4,p5,p6,p7} {}
+  DivChannelPair(const char* l, signed char p):
+    label(l),
+    pairs{p,-1,-1,-1,-1,-1,-1,-1} {}
+  DivChannelPair():
+    label(NULL),
+    pairs{-1,-1,-1,-1,-1,-1,-1,-1} {}
+};
+
+struct DivChannelModeHints {
+  const char* hint[4];
+  // valid types:
+  // - 0: disabled
+  // - 1: volume
+  // - 2: pitch
+  // - 3: panning
+  // - 4: ???
+  unsigned char type[4];
+  // up to 4
+  unsigned char count;
+
+  DivChannelModeHints():
+    hint{NULL,NULL,NULL,NULL},
+    type{0,0,0,0},
+    count(0) {}
 };
 
 class DivEngine;
@@ -405,6 +446,28 @@ class DivDispatch {
     virtual DivMacroInt* getChanMacroInt(int chan);
 
     /**
+     * get the stereo panning of a channel.
+     * @param chan the channel.
+     * @return a 16-bit number. left in top 8 bits and right in bottom 8 bits.
+     */
+    virtual unsigned short getPan(int chan);
+
+    /**
+     * get "paired" channels.
+     * @param chan the channel to query.
+     * @return a DivChannelPair.
+     */
+    virtual DivChannelPair getPaired(int chan);
+
+    /**
+     * get channel mode hints.
+     * @param chan the channel to query.
+     * @return a DivChannelModeHints.
+     */
+    virtual DivChannelModeHints getModeHints(int chan);
+    
+
+    /**
      * get currently playing sample (and its position).
      * @param chan the channel.
      * @return a DivSamplePos. if sample is -1 then nothing is playing or the
@@ -477,6 +540,12 @@ class DivDispatch {
      * @return whether it does.
      */
     virtual bool keyOffAffectsPorta(int ch);
+
+    /**
+     * test whether volume is global.
+     * @return whether it is.
+     */
+    virtual bool isVolGlobal();
 
     /**
      * get the lowest note in a portamento.

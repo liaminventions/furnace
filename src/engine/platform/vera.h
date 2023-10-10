@@ -51,7 +51,7 @@ class DivPlatformVERA: public DivDispatch {
     Channel chan[17];
     DivDispatchOscBuffer* oscBuf[17];
     bool isMuted[17];
-    unsigned char regPool[67];
+    unsigned char regPool[69];
     struct VERA_PSG* psg;
     struct VERA_PCM* pcm;
   
@@ -64,12 +64,14 @@ class DivPlatformVERA: public DivDispatch {
     int dispatch(DivCommand c);
     void* getChanState(int chan);
     DivMacroInt* getChanMacroInt(int ch);
+    unsigned short getPan(int chan);
     DivDispatchOscBuffer* getOscBuffer(int chan);
     unsigned char* getRegisterPool();
     int getRegisterPoolSize();
     void reset();
     void tick(bool sysTick=true);
     void muteChannel(int ch, bool mute);
+    void setFlags(const DivConfig& flags);
     void notifyInsDeletion(void* ins);
     float getPostAmp();
     int getOutputCount();

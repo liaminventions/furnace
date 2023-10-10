@@ -24,7 +24,7 @@
 #include <math.h>
 
 #define rWrite(a,v) if (!skipRegisterWrites) {pendingWrites[a]=v;}
-#define immWrite(a,v) if (!skipRegisterWrites) {writes.emplace(a,v); if (dumpWrites) {addWrite(a,v);} }
+#define immWrite(a,v) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v)); if (dumpWrites) {addWrite(a,v);} }
 
 #define KVSL(x,y) ((chan[x].state.op[orderedOpsL1[ops==4][y]].kvs==2 && isOutputL[ops==4][chan[x].state.alg][y]) || chan[x].state.op[orderedOpsL1[ops==4][y]].kvs==1)
 
@@ -160,9 +160,9 @@ const int orderedOpsL[4]={
 #define ADDR_LR_FB_ALG 0xc0
 
 void DivPlatformOPL::acquire_nuked(short** buf, size_t len) {
-  static short o[4];
-  static int os[4];
-  static ymfm::ymfm_output<2> aOut;
+  thread_local short o[4];
+  thread_local int os[4];
+  thread_local ymfm::ymfm_output<2> aOut;
 
   for (size_t h=0; h<len; h++) {
     os[0]=0; os[1]=0; os[2]=0; os[3]=0;
@@ -275,10 +275,19 @@ void DivPlatformOPL::acquire_nuked(short** buf, size_t len) {
     if (os[3]>32767) os[3]=32767;
   
     buf[0][h]=os[0];
-    if (oplType==3 || oplType==759) {
+    if (totalOutputs>1) {
       buf[1][h]=os[1];
+    }
+    if (totalOutputs>2) {
       buf[2][h]=os[2];
+    }
+    if (totalOutputs>3) {
       buf[3][h]=os[3];
+    }
+    if (totalOutputs==6) {
+      // placeholder for OPL4
+      buf[4][h]=0;
+      buf[5][h]=0;
     }
   }
 }
@@ -427,7 +436,7 @@ void DivPlatformOPL::tick(bool sysTick) {
       }
 
       if (m.tl.had) {
-        op.tl=63-m.tl.val;
+        op.tl=m.tl.val&63;
       }
       if (m.ksl.had) {
         op.ksl=m.ksl.val;
@@ -540,6 +549,8 @@ void DivPlatformOPL::tick(bool sysTick) {
           chan[adpcmChan].freq=5461; // 4KHz
         }
       }
+      if (chan[adpcmChan].freq<0) chan[adpcmChan].freq=0;
+      if (chan[adpcmChan].freq>65535) chan[adpcmChan].freq=65535;
       immWrite(16,chan[adpcmChan].freq&0xff);
       immWrite(17,(chan[adpcmChan].freq>>8)&0xff);
       if (chan[adpcmChan].keyOn || chan[adpcmChan].keyOff) {
@@ -709,6 +720,10 @@ void DivPlatformOPL::muteChannel(int ch, bool mute) {
         rWrite(baseAddr+ADDR_KSL_TL,op.tl|(op.ksl<<6));
       }
     }
+  }
+
+  if (properDrums && ch>melodicChans) {
+    return;
   }
 
   if (isMuted[ch]) {
@@ -1555,6 +1570,27 @@ DivMacroInt* DivPlatformOPL::getChanMacroInt(int ch) {
   return &chan[ch].std;
 }
 
+unsigned short DivPlatformOPL::getPan(int ch) {
+  if (totalOutputs<=1) return 0;
+  /*if (chan[ch&(~1)].fourOp) {
+    if (ch&1) {
+      return ((chan[ch-1].pan&2)<<7)|(chan[ch-1].pan&1);
+    } else {
+      return ((chan[ch+1].pan&2)<<7)|(chan[ch+1].pan&1);
+    }
+  }*/
+  return ((chan[ch].pan&1)<<8)|((chan[ch].pan&2)>>1);
+}
+
+DivChannelPair DivPlatformOPL::getPaired(int ch) {
+  if (oplType==3 && ch<12 && !(ch&1)) {
+    if (chan[ch].fourOp) {
+      return DivChannelPair("4OP",ch+1);
+    }
+  }
+  return DivChannelPair();
+}
+
 DivDispatchOscBuffer* DivPlatformOPL::getOscBuffer(int ch) {
   if (oplType==759 || chipType==8950) {
     if (ch>=totalChans+1) return NULL;
@@ -1590,7 +1626,7 @@ void DivPlatformOPL::reset() {
   }
   */
   if (downsample) {
-    const unsigned int downsampledRate=(unsigned int)((double)rate*rate/chipRateBase);
+    const unsigned int downsampledRate=(unsigned int)((double)rate*round(COLOR_NTSC/72.0)/(double)chipRateBase);
     OPL3_Reset(&fm,downsampledRate);
   } else {
     OPL3_Reset(&fm,rate);
@@ -1671,7 +1707,7 @@ void DivPlatformOPL::reset() {
 }
 
 int DivPlatformOPL::getOutputCount() {
-  return (oplType==3 || oplType==759)?4:1;
+  return totalOutputs;
 }
 
 bool DivPlatformOPL::keyOffAffectsArp(int ch) {
@@ -1730,6 +1766,7 @@ void DivPlatformOPL::setOPLType(int type, bool drums) {
       if (type==8950) {
         adpcmChan=drums?11:9;
       }
+      totalOutputs=1;
       break;
     case 3: case 4: case 759:
       slotsNonDrums=slotsOPL3;
@@ -1748,6 +1785,7 @@ void DivPlatformOPL::setOPLType(int type, bool drums) {
         chipFreqBase=32768*684;
         downsample=true;
       }
+      totalOutputs=(type==4)?6:4;
       break;
   }
   chipType=type;
@@ -1829,14 +1867,36 @@ void DivPlatformOPL::setFlags(const DivConfig& flags) {
         case 0x04:
           chipClock=15000000.0;
           break;
+        case 0x05:
+          chipClock=33868800.0;
+          break;
         default:
           chipClock=COLOR_NTSC*4.0;
           break;
       }
       CHECK_CUSTOM_CLOCK;
-      rate=chipClock/288;
-      chipRateBase=rate;
-      compatPan=flags.getBool("compatPan",false);
+      switch (flags.getInt("chipType",0)) {
+        case 1: // YMF289B
+          chipFreqBase=32768*684;
+          rate=chipClock/768;
+          chipRateBase=chipClock/684;
+          downsample=true;
+          totalOutputs=2; // Stereo output only
+          break;
+        default: // YMF262
+          chipFreqBase=32768*288;
+          rate=chipClock/288;
+          chipRateBase=rate;
+          downsample=false;
+          totalOutputs=4;
+          break;
+      }
+      if (downsample) {
+        const unsigned int downsampledRate=(unsigned int)((double)rate*round(COLOR_NTSC/72.0)/(double)chipRateBase);
+        OPL3_Resample(&fm,downsampledRate);
+      } else {
+        OPL3_Resample(&fm,rate);
+      }
       break;
     case 4:
       switch (flags.getInt("clockSel",0)) {
@@ -1860,6 +1920,7 @@ void DivPlatformOPL::setFlags(const DivConfig& flags) {
       chipClock=rate*288;
       break;
   }
+  compatPan=flags.getBool("compatPan",false);
 
   for (int i=0; i<20; i++) {
     oscBuf[i]->rate=rate;

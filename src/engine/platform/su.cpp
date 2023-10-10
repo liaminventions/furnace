@@ -23,7 +23,7 @@
 #include <math.h>
 
 //#define rWrite(a,v) pendingWrites[a]=v;
-#define rWrite(a,v) if (!skipRegisterWrites) {writes.emplace(a,v); if (dumpWrites) {addWrite(a,v);} }
+#define rWrite(a,v) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v)); if (dumpWrites) {addWrite(a,v);} }
 #define chWrite(c,a,v) rWrite(((c)<<5)|(a),v);
 
 #define CHIP_DIVIDER 2
@@ -458,6 +458,10 @@ DivMacroInt* DivPlatformSoundUnit::getChanMacroInt(int ch) {
   return &chan[ch].std;
 }
 
+unsigned short DivPlatformSoundUnit::getPan(int ch) {
+  return parent->convertPanLinearToSplit(chan[ch].pan+127,8,255);
+}
+
 DivDispatchOscBuffer* DivPlatformSoundUnit::getOscBuffer(int ch) {
   return oscBuf[ch];
 }
@@ -626,7 +630,7 @@ void DivPlatformSoundUnit::quit() {
     delete oscBuf[i];
   }
   delete su;
-  delete sampleMem;
+  delete[] sampleMem;
 }
 
 DivPlatformSoundUnit::~DivPlatformSoundUnit() {

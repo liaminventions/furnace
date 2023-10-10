@@ -306,8 +306,8 @@ void DivPlatformYM2608::acquire(short** buf, size_t len) {
 }
 
 void DivPlatformYM2608::acquire_combo(short** buf, size_t len) {
-  static int os[2];
-  static short ignored[2];
+  thread_local int os[2];
+  thread_local short ignored[2];
 
   ymfm::ssg_engine* ssge=fm->debug_ssg_engine();
   ymfm::adpcm_a_engine* aae=fm->debug_adpcm_a_engine();
@@ -402,7 +402,7 @@ void DivPlatformYM2608::acquire_combo(short** buf, size_t len) {
 
     
     for (int i=0; i<psgChanOffs; i++) {
-      oscBuf[i]->data[oscBuf[i]->needle++]=fm_nuked.ch_out[i]<<1;
+      oscBuf[i]->data[oscBuf[i]->needle++]=CLAMP(fm_nuked.ch_out[i]<<1,-32768,32767);
     }
 
     ssge->get_last_out(ssgOut);
@@ -419,7 +419,7 @@ void DivPlatformYM2608::acquire_combo(short** buf, size_t len) {
 }
 
 void DivPlatformYM2608::acquire_ymfm(short** buf, size_t len) {
-  static int os[2];
+  thread_local int os[2];
 
   ymfm::ym2608::fm_engine* fme=fm->debug_fm_engine();
   ymfm::ssg_engine* ssge=fm->debug_ssg_engine();
@@ -471,7 +471,8 @@ void DivPlatformYM2608::acquire_ymfm(short** buf, size_t len) {
     buf[1][h]=os[1];
 
     for (int i=0; i<6; i++) {
-      oscBuf[i]->data[oscBuf[i]->needle++]=(fmChan[i]->debug_output(0)+fmChan[i]->debug_output(1))<<1;
+      int out=(fmChan[i]->debug_output(0)+fmChan[i]->debug_output(1))<<1;
+      oscBuf[i]->data[oscBuf[i]->needle++]=CLAMP(out,-32768,32767);
     }
 
     ssge->get_last_out(ssgOut);
@@ -606,7 +607,7 @@ void DivPlatformYM2608::tick(bool sysTick) {
         rWrite(baseAddr+ADDR_SL_RR,(op.rr&15)|(op.sl<<4));
       }
       if (m.tl.had) {
-        op.tl=127-m.tl.val;
+        op.tl=m.tl.val;
         if (isMuted[i] || !op.enable) {
           rWrite(baseAddr+ADDR_TL,127);
         } else {
@@ -783,6 +784,8 @@ void DivPlatformYM2608::tick(bool sysTick) {
         chan[15].freq=0;
       }
     }
+    if (chan[adpcmBChanOffs].freq<0) chan[adpcmBChanOffs].freq=0;
+    if (chan[adpcmBChanOffs].freq>65535) chan[adpcmBChanOffs].freq=65535;
     immWrite(0x109,chan[15].freq&0xff);
     immWrite(0x10a,(chan[15].freq>>8)&0xff);
     hardResetElapsed+=2;
@@ -1153,6 +1156,7 @@ int DivPlatformYM2608::dispatch(DivCommand c) {
     }
     case DIV_CMD_FM_EXTCH: {
       if (extSys) {
+        if (extMode==(bool)c.value) break;
         extMode=c.value;
         immWrite(0x27,extMode?0x40:0);
       }
@@ -1460,6 +1464,11 @@ DivMacroInt* DivPlatformYM2608::getChanMacroInt(int ch) {
   return &chan[ch].std;
 }
 
+unsigned short DivPlatformYM2608::getPan(int ch) {
+  if (ch>=psgChanOffs && ch<adpcmAChanOffs) return 0;
+  return ((chan[ch].pan&2)<<7)|(chan[ch].pan&1);
+}
+
 DivDispatchOscBuffer* DivPlatformYM2608::getOscBuffer(int ch) {
   return oscBuf[ch];
 }
@@ -1481,7 +1490,7 @@ void DivPlatformYM2608::poke(std::vector<DivRegWrite>& wlist) {
 }
 
 void DivPlatformYM2608::reset() {
-  while (!writes.empty()) writes.pop_front();
+  writes.clear();
   memset(regPool,0,512);
   if (dumpWrites) {
     addWrite(0xffffffff,0);

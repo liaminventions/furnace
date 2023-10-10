@@ -23,7 +23,7 @@
 #include <string.h>
 #include <math.h>
 
-#define rWrite(a,v) if (!skipRegisterWrites) {writes.emplace(a,v); if (dumpWrites) {addWrite(a,v);} }
+#define rWrite(a,v) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v)); if (dumpWrites) {addWrite(a,v);} }
 
 #define CHIP_DIVIDER 2
 
@@ -363,6 +363,10 @@ void* DivPlatformSAA1099::getChanState(int ch) {
 
 DivMacroInt* DivPlatformSAA1099::getChanMacroInt(int ch) {
   return &chan[ch].std;
+}
+
+unsigned short DivPlatformSAA1099::getPan(int ch) {
+  return ((chan[ch].pan&0xf0)<<4)|(chan[ch].pan&15);
 }
 
 DivDispatchOscBuffer* DivPlatformSAA1099::getOscBuffer(int ch) {

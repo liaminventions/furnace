@@ -21,7 +21,7 @@
 #include "../engine.h"
 #include "../../ta-log.h"
 
-#define rWrite(a,v) if (!skipRegisterWrites) {writes.emplace(a,v); if (dumpWrites) {addWrite(a,v);} }
+#define rWrite(a,v) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v)); if (dumpWrites) {addWrite(a,v);} }
 
 #define CHIP_DIVIDER 1
 
@@ -404,6 +404,24 @@ void* DivPlatformPOKEY::getChanState(int ch) {
 
 DivMacroInt* DivPlatformPOKEY::getChanMacroInt(int ch) {
   return &chan[ch].std;
+}
+
+DivChannelPair DivPlatformPOKEY::getPaired(int ch) {
+  switch (ch) {
+    case 0:
+      if (audctl&4) return DivChannelPair("filter",2);
+      break;
+    case 1:
+      if (audctl&16) return DivChannelPair("16-bit",0);
+      break;
+    case 2:
+      if (audctl&8) return DivChannelPair("16-bit",3);
+      break;
+    case 3:
+      if (audctl&2) return DivChannelPair("filter",1);
+      break;
+  }
+  return DivChannelPair();
 }
 
 DivDispatchOscBuffer* DivPlatformPOKEY::getOscBuffer(int ch) {

@@ -23,8 +23,8 @@
 #include <string.h>
 #include <math.h>
 
-#define rWrite(a,v) if (!skipRegisterWrites) {writes.emplace(a,v); if (dumpWrites) {addWrite(a,v);} }
-#define rWriteDelay(a,v,d) if (!skipRegisterWrites) {writes.emplace(a,v,d); if (dumpWrites) {addWrite(a,v);} }
+#define rWrite(a,v) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v)); if (dumpWrites) {addWrite(a,v);} }
+#define rWriteDelay(a,v,d) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v,d)); if (dumpWrites) {addWrite(a,v);} }
 
 const char** DivPlatformMSM6295::getRegisterSheet() {
   return NULL;
@@ -185,7 +185,7 @@ int DivPlatformMSM6295::dispatch(DivCommand c) {
       chan[c.chan].std.release();
       break;
     case DIV_CMD_VOLUME: {
-      chan[c.chan].vol=c.value;
+      chan[c.chan].vol=MIN(8,c.value);
       if (!chan[c.chan].std.vol.has) {
         chan[c.chan].outVol=c.value;
       }

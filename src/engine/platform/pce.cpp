@@ -22,7 +22,7 @@
 #include <math.h>
 
 //#define rWrite(a,v) pendingWrites[a]=v;
-#define rWrite(a,v) if (!skipRegisterWrites) {writes.emplace(a,v); if (dumpWrites) {addWrite(a,v);} }
+#define rWrite(a,v) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v)); if (dumpWrites) {addWrite(a,v);} }
 #define chWrite(c,a,v) \
   if (!skipRegisterWrites) { \
     if (curChan!=c) { \
@@ -508,6 +508,10 @@ DivMacroInt* DivPlatformPCE::getChanMacroInt(int ch) {
   return &chan[ch].std;
 }
 
+unsigned short DivPlatformPCE::getPan(int ch) {
+  return ((chan[ch].pan&0xf0)<<4)|(chan[ch].pan&15);
+}
+
 DivSamplePos DivPlatformPCE::getSamplePos(int ch) {
   if (ch>=6) return DivSamplePos();
   if (!chan[ch].pcm) return DivSamplePos();
@@ -531,7 +535,7 @@ int DivPlatformPCE::getRegisterPoolSize() {
 }
 
 void DivPlatformPCE::reset() {
-  while (!writes.empty()) writes.pop();
+  writes.clear();
   memset(regPool,0,128);
   for (int i=0; i<6; i++) {
     chan[i]=DivPlatformPCE::Channel();

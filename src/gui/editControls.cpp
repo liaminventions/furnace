@@ -374,7 +374,7 @@ void FurnaceGUI::drawMobileControls() {
     if (portrait) ImGui::SameLine();
     if (ImGui::Button(ICON_FA_ARROW_DOWN "##StepOne",buttonSize)) {
       e->stepOne(cursor.y);
-      pendingStepUpdate=true;
+      pendingStepUpdate=1;
     }
 
     bool repeatPattern=e->getRepeatPattern();
@@ -509,9 +509,15 @@ void FurnaceGUI::drawMobileControls() {
           doAction(GUI_ACTION_SAVE_AS);
         }
 
-        ImGui::Button("1.1+ .dmf");
+        if (ImGui::Button("1.1+ .dmf")) {
+          mobileMenuOpen=false;
+          openFileDialog(GUI_FILE_SAVE_DMF);
+        }
         ImGui::SameLine();
-        ImGui::Button("Legacy .dmf");
+        if (ImGui::Button("Legacy .dmf")) {
+          mobileMenuOpen=false;
+          openFileDialog(GUI_FILE_SAVE_DMF_LEGACY);
+        }
         ImGui::SameLine();
         if (ImGui::Button("Export Audio")) {
           openFileDialog(GUI_FILE_EXPORT_AUDIO_ONE);
@@ -578,6 +584,10 @@ void FurnaceGUI::drawMobileControls() {
         if (ImGui::Button("Stats")) {
           statsOpen=!statsOpen;
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Grooves")) {
+          groovesOpen=!groovesOpen;
+        }
         if (ImGui::Button("Compat Flags")) {
           compatFlagsOpen=!compatFlagsOpen;
         }
@@ -619,6 +629,7 @@ void FurnaceGUI::drawMobileControls() {
             "Furnace Amiga emulator is working properly by\n"
             "comparing it with real Amiga output."
           );
+          ImGui::AlignTextToFramePadding();
           ImGui::Text("Directory");
           ImGui::SameLine();
           ImGui::InputText("##AVDPath",&workingDirROMExport);
@@ -664,6 +675,7 @@ void FurnaceGUI::drawEditControls() {
 
           ImGui::TableNextRow();
           ImGui::TableNextColumn();
+          ImGui::AlignTextToFramePadding();
           ImGui::Text("Octave");
           ImGui::TableNextColumn();
           ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
@@ -679,6 +691,7 @@ void FurnaceGUI::drawEditControls() {
 
           ImGui::TableNextRow();
           ImGui::TableNextColumn();
+          ImGui::AlignTextToFramePadding();
           ImGui::Text("Edit Step");
           ImGui::TableNextColumn();
           ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
@@ -717,6 +730,7 @@ void FurnaceGUI::drawEditControls() {
           e->setMetronome(metro);
         }
 
+        ImGui::AlignTextToFramePadding();
         ImGui::Text("Follow");
         ImGui::SameLine();
         unimportant(ImGui::Checkbox("Orders",&followOrders));
@@ -730,7 +744,7 @@ void FurnaceGUI::drawEditControls() {
         ImGui::SameLine();
         if (ImGui::Button(ICON_FA_ARROW_DOWN "##StepOne")) {
           e->stepOne(cursor.y);
-          pendingStepUpdate=true;
+          pendingStepUpdate=1;
         }
         if (ImGui::IsItemHovered()) {
           ImGui::SetTooltip("Step one row");
@@ -770,7 +784,7 @@ void FurnaceGUI::drawEditControls() {
         ImGui::SameLine();
         if (ImGui::Button(ICON_FA_ARROW_DOWN "##StepOne")) {
           e->stepOne(cursor.y);
-          pendingStepUpdate=true;
+          pendingStepUpdate=1;
         }
         if (ImGui::IsItemHovered()) {
           ImGui::SetTooltip("Step one row");
@@ -875,7 +889,7 @@ void FurnaceGUI::drawEditControls() {
         }
         if (ImGui::Button(ICON_FA_ARROW_DOWN "##StepOne",buttonSize)) {
           e->stepOne(cursor.y);
-          pendingStepUpdate=true;
+          pendingStepUpdate=1;
         }
         if (ImGui::IsItemHovered()) {
           ImGui::SetTooltip("Step one row");
@@ -1009,7 +1023,7 @@ void FurnaceGUI::drawEditControls() {
         ImGui::SameLine();
         if (ImGui::Button(ICON_FA_ARROW_DOWN "##StepOne")) {
           e->stepOne(cursor.y);
-          pendingStepUpdate=true;
+          pendingStepUpdate=1;
         }
         if (ImGui::IsItemHovered()) {
           ImGui::SetTooltip("Step one row");
@@ -1063,6 +1077,7 @@ void FurnaceGUI::drawEditControls() {
 
       if (ImGui::Begin("Edit Controls",&editControlsOpen,globalWinFlags)) {
         ImGui::Columns(2);
+        ImGui::AlignTextToFramePadding();
         ImGui::Text("Octave");
         ImGui::SameLine();
         float cursor=ImGui::GetCursorPosX();
@@ -1078,6 +1093,7 @@ void FurnaceGUI::drawEditControls() {
           }
         }
 
+        ImGui::AlignTextToFramePadding();
         ImGui::Text("Step");
         ImGui::SameLine();
         ImGui::SetCursorPosX(cursor);

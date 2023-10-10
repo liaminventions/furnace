@@ -20,7 +20,7 @@
 #ifndef _SONG_H
 #define _SONG_H
 #include <stdio.h>
-#include <vector>
+#include "../pch.h"
 
 #include "defines.h"
 #include "../ta-utils.h"
@@ -127,7 +127,11 @@ enum DivSystem {
   DIV_SYSTEM_YM2203_CSM,
   DIV_SYSTEM_YM2608_CSM,
   DIV_SYSTEM_SM8521,
-  DIV_SYSTEM_PV1000
+  DIV_SYSTEM_PV1000,
+  DIV_SYSTEM_K053260,
+  DIV_SYSTEM_TED,
+  DIV_SYSTEM_C140,
+  DIV_SYSTEM_C219
 };
 
 enum DivEffectType: unsigned short {
@@ -372,6 +376,7 @@ struct DivSong {
   bool patchbayAuto;
   bool brokenPortaLegato;
   bool brokenFMOff;
+  bool preNoteNoEffect;
 
   std::vector<DivInstrument*> ins;
   std::vector<DivWavetable*> wave;
@@ -490,7 +495,8 @@ struct DivSong {
     oldArpStrategy(false),
     patchbayAuto(true),
     brokenPortaLegato(false),
-    brokenFMOff(false) {
+    brokenFMOff(false),
+    preNoteNoEffect(false) {
     for (int i=0; i<DIV_MAX_CHIPS; i++) {
       system[i]=DIV_SYSTEM_NULL;
       systemVol[i]=1.0;

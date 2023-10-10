@@ -23,7 +23,7 @@
 #include <math.h>
 
 //#define rWrite(a,v) pendingWrites[a]=v;
-#define rWrite(a,v) if (!skipRegisterWrites) {writes.emplace(a,v); if (dumpWrites) {addWrite(a,v);} }
+#define rWrite(a,v) if (!skipRegisterWrites) {writes.push(QueuedWrite(a,v)); if (dumpWrites) {addWrite(a,v);} }
 
 const char* regCheatSheetT6W28[]={
   "Data0", "0",
@@ -298,6 +298,10 @@ void* DivPlatformT6W28::getChanState(int ch) {
 
 DivMacroInt* DivPlatformT6W28::getChanMacroInt(int ch) {
   return &chan[ch].std;
+}
+
+unsigned short DivPlatformT6W28::getPan(int ch) {
+  return (chan[ch].panL<<8)|chan[ch].panR;
 }
 
 DivDispatchOscBuffer* DivPlatformT6W28::getOscBuffer(int ch) {

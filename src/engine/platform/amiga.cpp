@@ -80,7 +80,7 @@ const char** DivPlatformAmiga::getRegisterSheet() {
   }
 
 void DivPlatformAmiga::acquire(short** buf, size_t len) {
-  static int outL, outR, output;
+  thread_local int outL, outR, output;
   for (size_t h=0; h<len; h++) {
     bool hsync=bypassLimits;
     outL=0;
@@ -809,6 +809,8 @@ void DivPlatformAmiga::setFlags(const DivConfig& flags) {
   } else {
     chipClock=COLOR_NTSC;
   }
+  CHECK_CUSTOM_CLOCK;
+  
   rate=chipClock/AMIGA_DIVIDER;
   for (int i=0; i<4; i++) {
     oscBuf[i]->rate=rate;

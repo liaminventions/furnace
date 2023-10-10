@@ -30,14 +30,12 @@
 #include "cmdStream.h"
 #include "../audio/taAudio.h"
 #include "blip_buf.h"
-#include <atomic>
 #include <functional>
 #include <initializer_list>
 #include <thread>
-#include <mutex>
-#include <map>
-#include <unordered_map>
-#include <deque>
+#include "../fixedQueue.h"
+
+class DivWorkPool;
 
 #define addWarning(x) \
   if (warnings.empty()) { \
@@ -54,16 +52,15 @@
 #define EXTERN_BUSY_BEGIN_SOFT e->softLocked=true; e->isBusy.lock();
 #define EXTERN_BUSY_END e->isBusy.unlock(); e->softLocked=false;
 
-#define DIV_VERSION "dev159"
-#define DIV_ENGINE_VERSION 159
+//#define DIV_UNSTABLE
+
+#define DIV_VERSION "0.6"
+#define DIV_ENGINE_VERSION 181
 // for imports
 #define DIV_VERSION_MOD 0xff01
 #define DIV_VERSION_FC 0xff02
 #define DIV_VERSION_S3M 0xff03
 #define DIV_VERSION_FTM 0xff04
-
-// "Namco C163"
-#define DIV_C163_DEFAULT_NAME "Namco 163"
 
 enum DivStatusView {
   DIV_STATUS_NOTHING=0,
@@ -74,6 +71,7 @@ enum DivStatusView {
 enum DivAudioEngines {
   DIV_AUDIO_JACK=0,
   DIV_AUDIO_SDL=1,
+  DIV_AUDIO_PORTAUDIO=2,
 
   DIV_AUDIO_NULL=126,
   DIV_AUDIO_DUMMY=127
@@ -107,7 +105,7 @@ struct DivChannelState {
   int vibratoDepth, vibratoRate, vibratoPos, vibratoPosGiant, vibratoDir, vibratoFine;
   int tremoloDepth, tremoloRate, tremoloPos;
   unsigned char arp, arpStage, arpTicks, panL, panR, panRL, panRR, lastVibrato, lastPorta;
-  bool doNote, legato, portaStop, keyOn, keyOff, nowYouCanStop, stopOnOff;
+  bool doNote, legato, portaStop, keyOn, keyOff, nowYouCanStop, stopOnOff, releasing;
   bool arpYield, delayLocked, inPorta, scheduledSlideReset, shorthandPorta, wasShorthandPorta, noteOnInhibit, resetArp;
   bool wentThroughNote, goneThroughNote;
 
@@ -156,6 +154,7 @@ struct DivChannelState {
     keyOff(false),
     nowYouCanStop(true),
     stopOnOff(false),
+    releasing(false),
     arpYield(false),
     delayLocked(false),
     inPorta(false),
@@ -174,14 +173,28 @@ struct DivChannelState {
 };
 
 struct DivNoteEvent {
-  int channel, ins, note, volume;
-  bool on;
+  signed char channel;
+  unsigned char ins;
+  signed char note, volume;
+  bool on, nop, pad1, pad2;
   DivNoteEvent(int c, int i, int n, int v, bool o):
     channel(c),
     ins(i),
     note(n),
     volume(v),
-    on(o) {}
+    on(o),
+    nop(false),
+    pad1(false),
+    pad2(false) {}
+  DivNoteEvent():
+    channel(-1),
+    ins(0),
+    note(0),
+    volume(0),
+    on(false),
+    nop(true),
+    pad1(false),
+    pad2(false) {}
 };
 
 struct DivDispatchContainer {
@@ -195,6 +208,10 @@ struct DivDispatchContainer {
   bool lowQuality, dcOffCompensation;
   double rateMemory;
 
+  // used in multi-thread
+  int cycles;
+  unsigned int size;
+
   void setRates(double gotRate);
   void setQuality(bool lowQual);
   void grow(size_t size);
@@ -202,7 +219,7 @@ struct DivDispatchContainer {
   void flush(size_t count);
   void fillBuf(size_t runtotal, size_t offset, size_t size);
   void clear();
-  void init(DivSystem sys, DivEngine* eng, int chanCount, double gotRate, const DivConfig& flags);
+  void init(DivSystem sys, DivEngine* eng, int chanCount, double gotRate, const DivConfig& flags, bool isRender=false);
   void quit();
   DivDispatchContainer():
     dispatch(NULL),
@@ -213,7 +230,9 @@ struct DivDispatchContainer {
     lastAvail(0),
     lowQuality(false),
     dcOffCompensation(false),
-    rateMemory(0.0) {
+    rateMemory(0.0),
+    cycles(0),
+    size(0) {
     memset(bb,0,DIV_MAX_OUTPUTS*sizeof(blip_buffer_t*));
     memset(temp,0,DIV_MAX_OUTPUTS*sizeof(int));
     memset(prevSample,0,DIV_MAX_OUTPUTS*sizeof(int));
@@ -284,6 +303,7 @@ struct DivSysDef {
   DivInstrumentType chanInsType[DIV_MAX_CHANS][2];
   const EffectHandlerMap effectHandlers;
   const EffectHandlerMap postEffectHandlers;
+  const EffectHandlerMap preEffectHandlers;
   DivSysDef(
     const char* sysName, const char* sysNameJ, unsigned char fileID, unsigned char fileID_DMF, int chans,
     bool isFMChip, bool isSTDChip, unsigned int vgmVer, bool compound, unsigned int formatMask, const char* desc,
@@ -293,7 +313,8 @@ struct DivSysDef {
     std::initializer_list<DivInstrumentType> chInsType1,
     std::initializer_list<DivInstrumentType> chInsType2={},
     const EffectHandlerMap fxHandlers_={},
-    const EffectHandlerMap postFxHandlers_={}):
+    const EffectHandlerMap postFxHandlers_={},
+    const EffectHandlerMap preFxHandlers_={}):
     name(sysName),
     nameJ(sysNameJ),
     description(desc),
@@ -306,7 +327,8 @@ struct DivSysDef {
     vgmVersion(vgmVer),
     sampleFormatMask(formatMask),
     effectHandlers(fxHandlers_),
-    postEffectHandlers(postFxHandlers_) {
+    postEffectHandlers(postFxHandlers_),
+    preEffectHandlers(preFxHandlers_) {
     memset(chanNames,0,DIV_MAX_CHANS*sizeof(void*));
     memset(chanShortNames,0,DIV_MAX_CHANS*sizeof(void*));
     memset(chanTypes,0,DIV_MAX_CHANS*sizeof(int));
@@ -417,11 +439,11 @@ class DivEngine {
   DivAudioExportModes exportMode;
   double exportFadeOut;
   DivConfig conf;
-  std::deque<DivNoteEvent> pendingNotes;
+  FixedQueue<DivNoteEvent,8192> pendingNotes;
   // bitfield
   unsigned char walked[8192];
   bool isMuted[DIV_MAX_CHANS];
-  std::mutex isBusy, saveLock;
+  std::mutex isBusy, saveLock, playPosLock;
   String configPath;
   String configFile;
   String lastError;
@@ -463,7 +485,6 @@ class DivEngine {
   int reversePitchTable[4096];
   int pitchTable[4096];
   short effectSlotMap[4096];
-  char c163NameCS[1024];
   int midiBaseChan;
   bool midiPoly;
   size_t midiAgeCounter;
@@ -480,25 +501,32 @@ class DivEngine {
   float metroFreq, metroPos;
   float metroAmp;
   float metroVol;
+  float previewVol;
 
   size_t totalProcessed;
+
+  unsigned int renderPoolThreads;
+  DivWorkPool* renderPool;
 
   // MIDI stuff
   std::function<int(const TAMidiMessage&)> midiCallback=[](const TAMidiMessage&) -> int {return -2;};
 
+  void processRowPre(int i);
   void processRow(int i, bool afterDelay);
   void nextOrder();
   void nextRow();
-  void performVGMWrite(SafeWriter* w, DivSystem sys, DivRegWrite& write, int streamOff, double* loopTimer, double* loopFreq, int* loopSample, bool* sampleDir, bool isSecond, int* pendingFreq, int* playingSample, size_t bankOffset, bool directStream);
+  void performVGMWrite(SafeWriter* w, DivSystem sys, DivRegWrite& write, int streamOff, double* loopTimer, double* loopFreq, int* loopSample, bool* sampleDir, bool isSecond, int* pendingFreq, int* playingSample, int* setPos, unsigned int* sampleOff8, unsigned int* sampleLen8, size_t bankOffset, bool directStream);
   // returns true if end of song.
   bool nextTick(bool noAccum=false, bool inhibitLowLat=false);
   bool perSystemEffect(int ch, unsigned char effect, unsigned char effectVal);
   bool perSystemPostEffect(int ch, unsigned char effect, unsigned char effectVal);
+  bool perSystemPreEffect(int ch, unsigned char effect, unsigned char effectVal);
   void recalcChans();
   void reset();
   void playSub(bool preserveDrift, int goalRow=0);
   void runMidiClock(int totalCycles=1);
   void runMidiTime(int totalCycles=1);
+  bool shallSwitchCores();
 
   void testFunction();
 
@@ -533,6 +561,9 @@ class DivEngine {
   void initSongWithDesc(const char* description, bool inBase64=true, bool oldVol=false);
 
   void exchangeIns(int one, int two);
+  void exchangeWave(int one, int two);
+  void exchangeSample(int one, int two);
+
   void swapChannels(int src, int dest);
   void stompChannel(int ch);
 
@@ -565,11 +596,13 @@ class DivEngine {
     DivSystem sysOfChan[DIV_MAX_CHANS];
     int dispatchOfChan[DIV_MAX_CHANS];
     int dispatchChanOfChan[DIV_MAX_CHANS];
+    int dispatchFirstChan[DIV_MAX_CHANS];
     bool keyHit[DIV_MAX_CHANS];
     float* oscBuf[DIV_MAX_OUTPUTS];
     float oscSize;
     int oscReadPos, oscWritePos;
     int tickMult;
+    int lastNBIns, lastNBOuts, lastNBSize;
     std::atomic<size_t> processTime;
 
     void runExportThread();
@@ -603,7 +636,7 @@ class DivEngine {
     // - -2 to add a whole loop of trailing
     SafeWriter* saveVGM(bool* sysToExport=NULL, bool loop=true, int version=0x171, bool patternHints=false, bool directStream=false, int trailingTicks=-1);
     // dump to ZSM.
-    SafeWriter* saveZSM(unsigned int zsmrate=60, bool loop=true);
+    SafeWriter* saveZSM(unsigned int zsmrate=60, bool loop=true, bool optimize=true);
     // dump command stream.
     SafeWriter* saveCommand(bool binary=false);
     // export to an audio file
@@ -612,6 +645,8 @@ class DivEngine {
     void waitAudioFile();
     // stop audio file export
     bool haltAudioFile();
+    // return back to playback cores if necessary
+    void finishAudioFile();
     // notify instrument parameter change
     void notifyInsChange(int ins);
     // notify wavetable change
@@ -686,11 +721,11 @@ class DivEngine {
     // find song loop position
     void walkSong(int& loopOrder, int& loopRow, int& loopEnd);
 
-    // play
-    void play();
+    // play (returns whether successful)
+    bool play();
 
-    // play to row
-    void playToRow(int row);
+    // play to row (returns whether successful)
+    bool playToRow(int row);
 
     // play by one row
     void stepOne(int row);
@@ -703,8 +738,12 @@ class DivEngine {
 
     // sample preview query
     bool isPreviewingSample();
+    int getSamplePreviewSample();
     int getSamplePreviewPos();
     double getSamplePreviewRate();
+
+    // set sample preview volume (1.0 = 100%)
+    void setSamplePreviewVol(float vol);
 
     // trigger sample preview
     void previewSample(int sample, int note=-1, int pStart=-1, int pEnd=-1);
@@ -807,6 +846,9 @@ class DivEngine {
     // get current row
     int getRow();
 
+    // synchronous get order/row
+    void getPlayPos(int& order, int& row);
+
     // get beat/bar
     int getElapsedBars();
     int getElapsedBeats();
@@ -859,13 +901,14 @@ class DivEngine {
 
     // get instrument from file
     // if the returned vector is empty then there was an error.
-    std::vector<DivInstrument*> instrumentFromFile(const char* path, bool loadAssets=true);
+    std::vector<DivInstrument*> instrumentFromFile(const char* path, bool loadAssets=true, bool readInsName=true);
 
     // load temporary instrument
     void loadTempIns(DivInstrument* which);
 
     // delete instrument
     void delInstrument(int index);
+    void delInstrumentUnsafe(int index);
 
     // add wavetable
     int addWave();
@@ -878,6 +921,7 @@ class DivEngine {
 
     // delete wavetable
     void delWave(int index);
+    void delWaveUnsafe(int index);
 
     // add sample
     int addSample();
@@ -893,6 +937,7 @@ class DivEngine {
 
     // delete sample
     void delSample(int index);
+    void delSampleUnsafe(int index, bool render=true);
 
     // add order
     void addOrder(int pos, bool duplicate, bool where);
@@ -965,11 +1010,17 @@ class DivEngine {
     // get dispatch channel state
     void* getDispatchChanState(int chan);
 
+    // get channel pairs
+    DivChannelPair getChanPaired(int chan);
+
     // get register pool
     unsigned char* getRegisterPool(int sys, int& size, int& depth);
 
     // get macro interpreter
     DivMacroInt* getMacroInt(int chan);
+
+    // get channel panning
+    unsigned short getChanPan(int chan);
 
     // get sample position
     DivSamplePos getSamplePos(int chan);
@@ -1038,10 +1089,14 @@ class DivEngine {
     unsigned int getSampleFormatMask();
 
     // UNSAFE render samples - only execute when locked
-    void renderSamples();
+    void renderSamples(int whichSample=-1);
 
     // public render samples
-    void renderSamplesP();
+    // values for whichSample
+    // -2: don't render anything - just update chip sample memory
+    // -1: render all samples
+    // >=0: render specific sample
+    void renderSamplesP(int whichSample=-1);
 
     // public swap channels
     void swapChannelsP(int src, int dest);
@@ -1052,6 +1107,9 @@ class DivEngine {
     // add subsong
     int addSubSong();
 
+    // duplicate subsong
+    int duplicateSubSong(int index);
+
     // remove subsong
     bool removeSubSong(int index);
 
@@ -1061,6 +1119,11 @@ class DivEngine {
 
     // clear all subsong data
     void clearSubSongs();
+
+    // optimize assets
+    void delUnusedIns();
+    void delUnusedWaves();
+    void delUnusedSamples();
 
     // change system
     void changeSystem(int index, DivSystem which, bool preserveOrder=true);
@@ -1127,7 +1190,7 @@ class DivEngine {
     TAAudioDesc& getAudioDescGot();
 
     // init dispatch
-    void initDispatch();
+    void initDispatch(bool isRender=false);
 
     // quit dispatch
     void quitDispatch();
@@ -1241,7 +1304,10 @@ class DivEngine {
       metroPos(0),
       metroAmp(0.0f),
       metroVol(1.0f),
+      previewVol(1.0f),
       totalProcessed(0),
+      renderPoolThreads(0),
+      renderPool(NULL),
       curOrders(NULL),
       curPat(NULL),
       tempIns(NULL),
@@ -1249,12 +1315,16 @@ class DivEngine {
       oscReadPos(0),
       oscWritePos(0),
       tickMult(1),
+      lastNBIns(0),
+      lastNBOuts(0),
+      lastNBSize(0),
       processTime(0),
       yrw801ROM(NULL),
       tg100ROM(NULL),
       mu5ROM(NULL) {
       memset(isMuted,0,DIV_MAX_CHANS*sizeof(bool));
       memset(keyHit,0,DIV_MAX_CHANS*sizeof(bool));
+      memset(dispatchFirstChan,0,DIV_MAX_CHANS*sizeof(int));
       memset(dispatchChanOfChan,0,DIV_MAX_CHANS*sizeof(int));
       memset(dispatchOfChan,0,DIV_MAX_CHANS*sizeof(int));
       memset(sysOfChan,0,DIV_MAX_CHANS*sizeof(int));

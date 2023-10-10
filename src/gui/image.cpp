@@ -46,7 +46,7 @@ const unsigned int imageLen[GUI_IMAGE_MAX]={
   image_pat_size
 };
 
-void* FurnaceGUI::getTexture(FurnaceGUIImages image, FurnaceGUIBlendMode blendMode) {
+FurnaceGUITexture* FurnaceGUI::getTexture(FurnaceGUIImages image, FurnaceGUIBlendMode blendMode) {
   FurnaceGUIImage* img=getImage(image);
 
   if (img==NULL) return NULL;
@@ -86,6 +86,20 @@ FurnaceGUIImage* FurnaceGUI::getImage(FurnaceGUIImages image) {
     }
 
     logV("%dx%d",ret->width,ret->height);
+
+#ifdef TA_BIG_ENDIAN
+    if (ret->ch==4) {
+      size_t total=ret->width*ret->height*ret->ch;
+      for (size_t i=0; i<total; i+=4) {
+        ret->data[i]^=ret->data[i|3];
+        ret->data[i|3]^=ret->data[i];
+        ret->data[i]^=ret->data[i|3];
+        ret->data[i|1]^=ret->data[i|2];
+        ret->data[i|2]^=ret->data[i|1];
+        ret->data[i|1]^=ret->data[i|2];
+      }
+    }
+#endif
 
     images[image]=ret;
   }

@@ -699,6 +699,17 @@ DivMacroInt* DivPlatformSNES::getChanMacroInt(int ch) {
   return &chan[ch].std;
 }
 
+unsigned short DivPlatformSNES::getPan(int ch) {
+  return (chan[ch].panL<<8)|chan[ch].panR;
+}
+
+DivChannelPair DivPlatformSNES::getPaired(int ch) {
+  if (chan[ch].pitchMod) {
+    return DivChannelPair("mod",(ch-1)&7);
+  }
+  return DivChannelPair();
+}
+
 DivSamplePos DivPlatformSNES::getSamplePos(int ch) {
   if (ch>=8) return DivSamplePos();
   if (!chan[ch].active) return DivSamplePos();
@@ -733,6 +744,7 @@ int DivPlatformSNES::getRegisterPoolSize() {
 
 void DivPlatformSNES::initEcho() {
   unsigned char esa=0xf8-(echoDelay<<3);
+  unsigned char control=(noiseFreq&0x1f)|(echoOn?0:0x20);
   if (echoOn) {
     rWrite(0x6d,esa);
     rWrite(0x7d,echoDelay);
@@ -742,16 +754,19 @@ void DivPlatformSNES::initEcho() {
     for (int i=0; i<8; i++) {
       rWrite(0x0f+(i<<4),echoFIR[i]);
     }
+    rWrite(0x6c,control);
   } else {
-    rWrite(0x6d,0);
-    rWrite(0x7d,0);
     rWrite(0x2c,0);
     rWrite(0x3c,0);
+    rWrite(0x6c,control);
+    rWrite(0x7d,0);
+    rWrite(0x6d,0xff);
   }
-  writeControl=true;
 }
 
 void DivPlatformSNES::reset() {
+  writes.clear();
+
   memcpy(sampleMem,copyOfSampleMem,65536);
   dsp.init(sampleMem);
   dsp.set_output(NULL,0);

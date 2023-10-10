@@ -23,7 +23,7 @@
 #include "../dispatch.h"
 #include "../waveSynth.h"
 #include "sound/swan.h"
-#include <queue>
+#include "../../fixedQueue.h"
 
 class DivPlatformSwan: public DivDispatch {
   struct Channel: public SharedChannel<int> {
@@ -46,12 +46,13 @@ class DivPlatformSwan: public DivDispatch {
 
   unsigned char regPool[0x80];
   struct QueuedWrite {
-      unsigned char addr;
-      unsigned char val;
-      QueuedWrite(unsigned char a, unsigned char v): addr(a), val(v) {}
+    unsigned char addr;
+    unsigned char val;
+    QueuedWrite(): addr(0), val(0) {}
+    QueuedWrite(unsigned char a, unsigned char v): addr(a), val(v) {}
   };
-  std::queue<QueuedWrite> writes;
-  std::queue<DivRegWrite> postDACWrites;
+  FixedQueue<QueuedWrite,256> writes;
+  FixedQueue<DivRegWrite,2048> postDACWrites;
   WSwan* ws;
   void updateWave(int ch);
   friend void putDispatchChip(void*,int);
@@ -61,6 +62,7 @@ class DivPlatformSwan: public DivDispatch {
     int dispatch(DivCommand c);
     void* getChanState(int chan);
     DivMacroInt* getChanMacroInt(int ch);
+    unsigned short getPan(int chan);
     DivDispatchOscBuffer* getOscBuffer(int chan);
     unsigned char* getRegisterPool();
     int getRegisterPoolSize();
@@ -68,6 +70,7 @@ class DivPlatformSwan: public DivDispatch {
     void forceIns();
     void tick(bool sysTick=true);
     void muteChannel(int ch, bool mute);
+    void setFlags(const DivConfig& flags);
     void notifyWaveChange(int wave);
     void notifyInsDeletion(void* ins);
     int getOutputCount();

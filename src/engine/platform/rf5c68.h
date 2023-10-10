@@ -21,7 +21,6 @@
 #define _RF5C68_H
 
 #include "../dispatch.h"
-#include <queue>
 #include "sound/rf5c68.h"
 
 class DivPlatformRF5C68: public DivDispatch {
@@ -60,6 +59,7 @@ class DivPlatformRF5C68: public DivDispatch {
     int dispatch(DivCommand c);
     void* getChanState(int chan);
     DivMacroInt* getChanMacroInt(int ch);
+    unsigned short getPan(int chan);
     DivDispatchOscBuffer* getOscBuffer(int chan);
     unsigned char* getRegisterPool();
     int getRegisterPoolSize();

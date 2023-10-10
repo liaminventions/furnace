@@ -21,7 +21,6 @@
 #define _QSOUND_H
 
 #include "../dispatch.h"
-#include <queue>
 #include "sound/qsound.h"
 
 class DivPlatformQSound: public DivDispatch {
@@ -67,6 +66,7 @@ class DivPlatformQSound: public DivDispatch {
     int dispatch(DivCommand c);
     void* getChanState(int chan);
     DivMacroInt* getChanMacroInt(int ch);
+    unsigned short getPan(int chan);
     DivDispatchOscBuffer* getOscBuffer(int chan);
     unsigned char* getRegisterPool();
     int getRegisterPoolSize();

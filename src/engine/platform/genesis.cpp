@@ -63,7 +63,7 @@ void DivPlatformGenesis::processDAC(int iRate) {
       for (int i=5; i<7; i++) {
         if (chan[i].dacSample!=-1) {
           DivSample* s=parent->getSample(chan[i].dacSample);
-          if (!isMuted[i] && s->samples>0) {
+          if (!isMuted[i] && s->samples>0 && chan[i].dacPos<s->samples) {
             if (parent->song.noOPN2Vol) {
               chan[i].dacOutput=s->data8[chan[i].dacDirection?(s->samples-chan[i].dacPos-1):chan[i].dacPos];
             } else {
@@ -96,34 +96,22 @@ void DivPlatformGenesis::processDAC(int iRate) {
       //sample>>=1;
       if (sample<-128) sample=-128;
       if (sample>127) sample=127;
-      urgentWrite(0x2a,(unsigned char)sample+0x80);
+      dacWrite=(unsigned char)(sample+0x80);
     }
   } else {
-    if (!chan[5].dacReady) {
-      chan[5].dacDelay+=32000;
-      if (chan[5].dacDelay>=iRate) {
-        chan[5].dacDelay-=iRate;
-        chan[5].dacReady=true;
-      }
-    }
     if (chan[5].dacMode && chan[5].dacSample!=-1) {
       chan[5].dacPeriod+=chan[5].dacRate;
       if (chan[5].dacPeriod>=iRate) {
         DivSample* s=parent->getSample(chan[5].dacSample);
-        if (s->samples>0) {
+        if (s->samples>0 && chan[5].dacPos<s->samples) {
           if (!isMuted[5]) {
-            if (chan[5].dacReady && writes.size()<16) {
-              int sample;
-              if (parent->song.noOPN2Vol) {
-                sample=s->data8[chan[5].dacDirection?(s->samples-chan[5].dacPos-1):chan[5].dacPos];
-              } else {
-                sample=(s->data8[chan[5].dacDirection?(s->samples-chan[5].dacPos-1):chan[5].dacPos]*dacVolTable[chan[5].outVol])>>7;
-              }
-              urgentWrite(0x2a,(unsigned char)sample+0x80);
-              chan[5].dacReady=false;
+            int sample;
+            if (parent->song.noOPN2Vol) {
+              sample=s->data8[chan[5].dacDirection?(s->samples-chan[5].dacPos-1):chan[5].dacPos];
+            } else {
+              sample=(s->data8[chan[5].dacDirection?(s->samples-chan[5].dacPos-1):chan[5].dacPos]*dacVolTable[chan[5].outVol])>>7;
             }
-          } else {
-            urgentWrite(0x2a,0x80);
+            dacWrite=(unsigned char)(sample+0x80);
           }
           chan[5].dacPos++;
           if (!chan[5].dacDirection && (s->isLoopable() && chan[5].dacPos>=(unsigned int)s->loopEnd)) {
@@ -144,8 +132,8 @@ void DivPlatformGenesis::processDAC(int iRate) {
 }
 
 void DivPlatformGenesis::acquire_nuked(short** buf, size_t len) {
-  static short o[2];
-  static int os[2];
+  thread_local short o[2];
+  thread_local int os[2];
 
   for (size_t h=0; h<len; h++) {
     processDAC(rate);
@@ -153,24 +141,34 @@ void DivPlatformGenesis::acquire_nuked(short** buf, size_t len) {
     os[0]=0; os[1]=0;
     for (int i=0; i<6; i++) {
       if (!writes.empty()) {
-        if (--delay<0) {
-          delay=0;
-          QueuedWrite& w=writes.front();
-          if (w.addrOrVal) {
-            //logV("%.3x = %.2x",w.addr,w.val);
-            OPN2_Write(&fm,0x1+((w.addr>>8)<<1),w.val);
-            lastBusy=0;
-            regPool[w.addr&0x1ff]=w.val;
-            writes.pop_front();
-          } else {
-            lastBusy++;
-            if (fm.write_busy==0) {
-              OPN2_Write(&fm,0x0+((w.addr>>8)<<1),w.addr);
-              w.addrOrVal=true;
+        QueuedWrite& w=writes.front();
+        if (w.addrOrVal) {
+          //logV("%.3x = %.2x",w.addr,w.val);
+          OPN2_Write(&fm,0x1+((w.addr>>8)<<1),w.val);
+          regPool[w.addr&0x1ff]=w.val;
+          writes.pop_front();
+
+          if (dacWrite>=0) {
+            if (!canWriteDAC) {
+              canWriteDAC=true;
+            } else {
+              urgentWrite(0x2a,dacWrite);
+              dacWrite=-1;
+              canWriteDAC=writes.empty();
             }
+          }
+        } else {
+          if (fm.write_busy==0) {
+            OPN2_Write(&fm,0x0+((w.addr>>8)<<1),w.addr);
+            w.addrOrVal=true;
           }
         }
       } else {
+        canWriteDAC=true;
+        if (dacWrite>=0) {
+          urgentWrite(0x2a,dacWrite);
+          dacWrite=-1;
+        }
         flushFirst=false;
       }
       
@@ -215,7 +213,7 @@ void DivPlatformGenesis::acquire_nuked(short** buf, size_t len) {
 }
 
 void DivPlatformGenesis::acquire_ymfm(short** buf, size_t len) {
-  static int os[2];
+  thread_local int os[2];
 
   ymfm::ym2612::fm_engine* fme=fm_ymfm->debug_engine();
 
@@ -229,8 +227,22 @@ void DivPlatformGenesis::acquire_ymfm(short** buf, size_t len) {
       fm_ymfm->write(0x1+((w.addr>>8)<<1),w.val);
       regPool[w.addr&0x1ff]=w.val;
       writes.pop_front();
-      lastBusy=1;
+
+      if (dacWrite>=0) {
+        if (!canWriteDAC) {
+          canWriteDAC=true;
+        } else {
+          urgentWrite(0x2a,dacWrite);
+          dacWrite=-1;
+          canWriteDAC=writes.empty();
+        }
+      }
     } else {
+      canWriteDAC=true;
+      if (dacWrite>=0) {
+        urgentWrite(0x2a,dacWrite);
+        dacWrite=-1;
+      }
       flushFirst=false;
     }
     
@@ -286,9 +298,14 @@ void DivPlatformGenesis::acquire(short** buf, size_t len) {
 }
 
 void DivPlatformGenesis::fillStream(std::vector<DivDelayedWrite>& stream, int sRate, size_t len) {
-  while (!writes.empty()) writes.pop_front();
+  writes.clear();
   for (size_t i=0; i<len; i++) {
     processDAC(sRate);
+
+    if (dacWrite>=0) {
+      urgentWrite(0x2a,dacWrite);
+      dacWrite=-1;
+    }
 
     while (!writes.empty()) {
       QueuedWrite& w=writes.front();
@@ -456,7 +473,7 @@ void DivPlatformGenesis::tick(bool sysTick) {
         rWrite(baseAddr+ADDR_SL_RR,(op.rr&15)|(op.sl<<4));
       }
       if (m.tl.had) {
-        op.tl=127-m.tl.val;
+        op.tl=m.tl.val;
         if (isMuted[i] || !op.enable) {
           rWrite(baseAddr+ADDR_TL,127);
         } else {
@@ -595,6 +612,7 @@ void DivPlatformGenesis::muteChannel(int ch, bool mute) {
   isMuted[ch]=mute;
   if (ch>6) return;
   if (ch<6) {
+    if (ch==5) immWrite(0x2a,0x80);
     for (int j=0; j<4; j++) {
       unsigned short baseAddr=chanOffs[ch]|opOffs[j];
       DivInstrumentFM::Operator& op=chan[ch].state.op[j];
@@ -702,7 +720,11 @@ int DivPlatformGenesis::dispatch(DivCommand c) {
               addWrite(0xffff0003,chan[c.chan].dacDirection);
             }
           }
-          chan[c.chan].dacPos=0;
+          if (chan[c.chan].setPos) {
+            chan[c.chan].setPos=false;
+          } else {
+            chan[c.chan].dacPos=0;
+          }
           chan[c.chan].dacPeriod=0;
           if (c.value!=DIV_NOTE_NULL) {
             chan[c.chan].baseFreq=parent->calcBaseFreq(1,1,c.value,false);
@@ -925,6 +947,12 @@ int DivPlatformGenesis::dispatch(DivCommand c) {
       if (dumpWrites) addWrite(0xffff0003,chan[c.chan].dacDirection);
       break;
     }
+    case DIV_CMD_SAMPLE_POS:
+      if (c.chan<5) c.chan=5;
+      chan[c.chan].dacPos=c.value;
+      chan[c.chan].setPos=true;
+      if (dumpWrites) addWrite(0xffff0005,chan[c.chan].dacPos);
+      break;
     case DIV_CMD_LEGATO: {
       if (c.chan==csmChan) {
         chan[c.chan].baseFreq=NOTE_PERIODIC(c.value);
@@ -944,6 +972,7 @@ int DivPlatformGenesis::dispatch(DivCommand c) {
     }
     case DIV_CMD_FM_EXTCH: {
       if (extSys) {
+        if (extMode==(bool)c.value) break;
         extMode=c.value;
         immWrite(0x27,extMode?0x40:0);
       }
@@ -1245,6 +1274,11 @@ DivMacroInt* DivPlatformGenesis::getChanMacroInt(int ch) {
   return &chan[ch].std;
 }
 
+unsigned short DivPlatformGenesis::getPan(int ch) {
+  if (ch>5) ch=5;
+  return ((chan[ch].pan&2)<<7)|(chan[ch].pan&1);
+}
+
 DivSamplePos DivPlatformGenesis::getSamplePos(int ch) {
   if (!chan[5].dacMode) return DivSamplePos();
   if (ch<5) return DivSamplePos();
@@ -1273,7 +1307,7 @@ float DivPlatformGenesis::getPostAmp() {
 }
 
 void DivPlatformGenesis::reset() {
-  while (!writes.empty()) writes.pop_front();
+  writes.clear();
   memset(regPool,0,512);
   if (useYMFM) {
     fm_ymfm->reset();
@@ -1305,11 +1339,12 @@ void DivPlatformGenesis::reset() {
     pendingWrites[i]=-1;
   }
 
-  lastBusy=60;
   lfoValue=8;
   softPCMTimer=0;
   extMode=false;
   flushFirst=false;
+  dacWrite=-1;
+  canWriteDAC=true;
 
   if (softPCM) {
     chan[5].dacMode=true;
@@ -1321,8 +1356,6 @@ void DivPlatformGenesis::reset() {
 
   // LFO
   immWrite(0x22,lfoValue);
-  
-  delay=0;
 }
 
 int DivPlatformGenesis::getOutputCount() {

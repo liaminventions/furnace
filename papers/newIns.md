@@ -117,6 +117,10 @@ the following instrument types are available:
 - 47: Pokémon Mini/QuadTone
 - 48: SM8521
 - 49: PV-1000
+- 50: K053260
+- 52: TED
+- 53: C140
+- 54: C219
 
 the following feature codes are recognized:
 
@@ -468,6 +472,12 @@ size | description
   1  | wave pos
   1  | wave len
   1  | wave mode
+     | **extra info** (>=164)
+  1  | enable per channel wave pos/len
+  8  | per channel wave pos
+     | - only read if enabled.
+  8  | per channel wave len
+     | - only read if enabled.
 ```
 
 # FDS/Virtual Boy data (FD)

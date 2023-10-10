@@ -33,6 +33,18 @@ void* DivDispatch::getChanState(int chan) {
   return NULL;
 }
 
+unsigned short DivDispatch::getPan(int chan) {
+  return 0;
+}
+
+DivChannelPair DivDispatch::getPaired(int chan) {
+  return DivChannelPair();
+}
+
+DivChannelModeHints DivDispatch::getModeHints(int chan) {
+  return DivChannelModeHints();
+}
+
 DivMacroInt* DivDispatch::getChanMacroInt(int chan) {
   return NULL;
 }
@@ -83,6 +95,10 @@ bool DivDispatch::keyOffAffectsArp(int ch) {
 }
 
 bool DivDispatch::keyOffAffectsPorta(int ch) {
+  return false;
+}
+
+bool DivDispatch::isVolGlobal() {
   return false;
 }
 

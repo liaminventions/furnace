@@ -130,14 +130,15 @@ class DivPlatformOPN: public DivPlatformFMBase {
       unsigned char freqH, freqL;
       int portaPauseFreq;
       signed char konCycles;
-      bool mask;
+      bool mask, hardReset;
       OPNOpChannel():
         SharedChannel<int>(0),
         freqH(0),
         freqL(0),
         portaPauseFreq(0),
         konCycles(0),
-        mask(true) {}
+        mask(true),
+        hardReset(false) {}
     };
 
     struct OPNOpChannelStereo: public OPNOpChannel {
@@ -154,6 +155,7 @@ class DivPlatformOPN: public DivPlatformFMBase {
     unsigned int ayDiv;
     unsigned char csmChan;
     unsigned char lfoValue;
+    unsigned char lastExtChPan;
     unsigned short ssgVol;
     unsigned short fmVol;
     bool extSys, useCombo, fbAllOps;
@@ -174,6 +176,7 @@ class DivPlatformOPN: public DivPlatformFMBase {
       ayDiv(a),
       csmChan(cc),
       lfoValue(0),
+      lastExtChPan(3),
       ssgVol(128),
       fmVol(256),
       extSys(isExtSys),

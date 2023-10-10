@@ -134,7 +134,24 @@ bool DivInstrumentN163::operator==(const DivInstrumentN163& other) {
     _C(wave) &&
     _C(wavePos) &&
     _C(waveLen) &&
-    _C(waveMode)
+    _C(waveMode) &&
+    _C(perChanPos) &&
+    _C(wavePosCh[0]) &&
+    _C(wavePosCh[1]) &&
+    _C(wavePosCh[2]) &&
+    _C(wavePosCh[3]) &&
+    _C(wavePosCh[4]) &&
+    _C(wavePosCh[5]) &&
+    _C(wavePosCh[6]) &&
+    _C(wavePosCh[7]) &&
+    _C(waveLenCh[0]) &&
+    _C(waveLenCh[1]) &&
+    _C(waveLenCh[2]) &&
+    _C(waveLenCh[3]) &&
+    _C(waveLenCh[4]) &&
+    _C(waveLenCh[5]) &&
+    _C(waveLenCh[6]) &&
+    _C(waveLenCh[7])
   );
 }
 
@@ -274,7 +291,7 @@ void DivInstrument::writeFeatureFM(SafeWriter* w, bool fui) {
   FEATURE_END;
 }
 
-void DivInstrument::writeMacro(SafeWriter* w, const DivInstrumentMacro& m, unsigned char macroCode) {
+void DivInstrument::writeMacro(SafeWriter* w, const DivInstrumentMacro& m) {
   if (!m.len) return;
 
   // determine word size
@@ -297,7 +314,7 @@ void DivInstrument::writeMacro(SafeWriter* w, const DivInstrumentMacro& m, unsig
     wordSize=192; // 32-bit signed
   }
 
-  w->writeC(macroCode);
+  w->writeC(m.macroType&31);
   w->writeC(m.len);
   w->writeC(m.loop);
   w->writeC(m.rel);
@@ -338,26 +355,26 @@ void DivInstrument::writeFeatureMA(SafeWriter* w) {
   w->writeS(8);
   
   // write macros
-  writeMacro(w,std.volMacro,0);
-  writeMacro(w,std.arpMacro,1);
-  writeMacro(w,std.dutyMacro,2);
-  writeMacro(w,std.waveMacro,3);
-  writeMacro(w,std.pitchMacro,4);
-  writeMacro(w,std.ex1Macro,5);
-  writeMacro(w,std.ex2Macro,6);
-  writeMacro(w,std.ex3Macro,7);
-  writeMacro(w,std.algMacro,8);
-  writeMacro(w,std.fbMacro,9);
-  writeMacro(w,std.fmsMacro,10);
-  writeMacro(w,std.amsMacro,11);
-  writeMacro(w,std.panLMacro,12);
-  writeMacro(w,std.panRMacro,13);
-  writeMacro(w,std.phaseResetMacro,14);
-  writeMacro(w,std.ex4Macro,15);
-  writeMacro(w,std.ex5Macro,16);
-  writeMacro(w,std.ex6Macro,17);
-  writeMacro(w,std.ex7Macro,18);
-  writeMacro(w,std.ex8Macro,19);
+  writeMacro(w,std.volMacro);
+  writeMacro(w,std.arpMacro);
+  writeMacro(w,std.dutyMacro);
+  writeMacro(w,std.waveMacro);
+  writeMacro(w,std.pitchMacro);
+  writeMacro(w,std.ex1Macro);
+  writeMacro(w,std.ex2Macro);
+  writeMacro(w,std.ex3Macro);
+  writeMacro(w,std.algMacro);
+  writeMacro(w,std.fbMacro);
+  writeMacro(w,std.fmsMacro);
+  writeMacro(w,std.amsMacro);
+  writeMacro(w,std.panLMacro);
+  writeMacro(w,std.panRMacro);
+  writeMacro(w,std.phaseResetMacro);
+  writeMacro(w,std.ex4Macro);
+  writeMacro(w,std.ex5Macro);
+  writeMacro(w,std.ex6Macro);
+  writeMacro(w,std.ex7Macro);
+  writeMacro(w,std.ex8Macro);
 
   // "stop reading" code
   w->writeC(-1);
@@ -454,26 +471,26 @@ void DivInstrument::writeFeatureOx(SafeWriter* w, int ope) {
   // write macros
   const DivInstrumentSTD::OpMacro& o=std.opMacros[ope];
 
-  writeMacro(w,o.amMacro,0);
-  writeMacro(w,o.arMacro,1);
-  writeMacro(w,o.drMacro,2);
-  writeMacro(w,o.multMacro,3);
-  writeMacro(w,o.rrMacro,4);
-  writeMacro(w,o.slMacro,5);
-  writeMacro(w,o.tlMacro,6);
-  writeMacro(w,o.dt2Macro,7);
-  writeMacro(w,o.rsMacro,8);
-  writeMacro(w,o.dtMacro,9);
-  writeMacro(w,o.d2rMacro,10);
-  writeMacro(w,o.ssgMacro,11);
-  writeMacro(w,o.damMacro,12);
-  writeMacro(w,o.dvbMacro,13);
-  writeMacro(w,o.egtMacro,14);
-  writeMacro(w,o.kslMacro,15);
-  writeMacro(w,o.susMacro,16);
-  writeMacro(w,o.vibMacro,17);
-  writeMacro(w,o.wsMacro,18);
-  writeMacro(w,o.ksrMacro,19);
+  writeMacro(w,o.amMacro);
+  writeMacro(w,o.arMacro);
+  writeMacro(w,o.drMacro);
+  writeMacro(w,o.multMacro);
+  writeMacro(w,o.rrMacro);
+  writeMacro(w,o.slMacro);
+  writeMacro(w,o.tlMacro);
+  writeMacro(w,o.dt2Macro);
+  writeMacro(w,o.rsMacro);
+  writeMacro(w,o.dtMacro);
+  writeMacro(w,o.d2rMacro);
+  writeMacro(w,o.ssgMacro);
+  writeMacro(w,o.damMacro);
+  writeMacro(w,o.dvbMacro);
+  writeMacro(w,o.egtMacro);
+  writeMacro(w,o.kslMacro);
+  writeMacro(w,o.susMacro);
+  writeMacro(w,o.vibMacro);
+  writeMacro(w,o.wsMacro);
+  writeMacro(w,o.ksrMacro);
 
   // "stop reading" code
   w->writeC(-1);
@@ -518,6 +535,17 @@ void DivInstrument::writeFeatureN1(SafeWriter* w) {
   w->writeC(n163.wavePos);
   w->writeC(n163.waveLen);
   w->writeC(n163.waveMode);
+
+  w->writeC(n163.perChanPos);
+
+  if (n163.perChanPos) {
+    for (int i=0; i<8; i++) {
+      w->writeC(n163.wavePosCh[i]);
+    }
+    for (int i=0; i<8; i++) {
+      w->writeC(n163.waveLenCh[i]);
+    }
+  }
 
   FEATURE_END;
 }
@@ -691,7 +719,7 @@ void DivInstrument::writeFeatureX1(SafeWriter* w) {
   FEATURE_END;
 }
 
-void DivInstrument::putInsData2(SafeWriter* w, bool fui, const DivSong* song) {
+void DivInstrument::putInsData2(SafeWriter* w, bool fui, const DivSong* song, bool insName) {
   size_t blockStartSeek=0;
   size_t blockEndSeek=0;
   size_t slSeek=0;
@@ -929,6 +957,20 @@ void DivInstrument::putInsData2(SafeWriter* w, bool fui, const DivSong* song) {
         break;
       case DIV_INS_PV1000:
         break;
+      case DIV_INS_K053260:
+        featureSM=true;
+        featureSL=true;
+        break;
+      case DIV_INS_TED:
+        break;
+      case DIV_INS_C140:
+        featureSM=true;
+        featureSL=true;
+        break;
+      case DIV_INS_C219:
+        featureSM=true;
+        featureSL=true;
+        break;
       
       case DIV_INS_MAX:
         break;
@@ -979,7 +1021,7 @@ void DivInstrument::putInsData2(SafeWriter* w, bool fui, const DivSong* song) {
   }
 
   // check ins name
-  if (!name.empty()) {
+  if (!name.empty() && insName) {
     featureNA=true;
   }
 
@@ -2223,6 +2265,19 @@ void DivInstrument::readFeatureOx(SafeReader& reader, int op, short version) {
         }
         break;
     }
+
+    // <167 TL macro compat
+    if (macroCode==6 && version<167) {
+      if (target->open&6) {
+        for (int j=0; j<2; j++) {
+          target->val[j]^=0x7f;
+        }
+      } else {
+        for (int j=0; j<target->len; j++) {
+          target->val[j]^=0x7f;
+        }
+      }
+    }
   }
 
   READ_FEAT_END;
@@ -2275,6 +2330,18 @@ void DivInstrument::readFeatureN1(SafeReader& reader, short version) {
   n163.wavePos=(unsigned char)reader.readC();
   n163.waveLen=(unsigned char)reader.readC();
   n163.waveMode=(unsigned char)reader.readC();
+
+  if (version>=164) {
+    n163.perChanPos=reader.readC();
+    if (n163.perChanPos) {
+      for (int i=0; i<8; i++) {
+        n163.wavePosCh[i]=(unsigned char)reader.readC();
+      }
+      for (int i=0; i<8; i++) {
+        n163.waveLenCh[i]=(unsigned char)reader.readC();
+      }
+    }
+  }
 
   READ_FEAT_END;
 }
@@ -3269,6 +3336,21 @@ DivDataErrors DivInstrument::readInsDataOld(SafeReader &reader, short version) {
     }
   }
 
+  // <167 TL macro compat
+  if (version<167) {
+    for (int i=0; i<4; i++) {
+      if (std.opMacros[i].tlMacro.open&6) {
+          for (int j=0; j<2; j++) {
+          std.opMacros[i].tlMacro.val[j]^=0x7f;
+        }
+      } else {
+        for (int j=0; j<std.opMacros[i].tlMacro.len; j++) {
+          std.opMacros[i].tlMacro.val[j]^=0x7f;
+        }
+      }
+    }
+  }
+
   return DIV_DATA_SUCCESS;
 }
 
@@ -3298,7 +3380,7 @@ DivDataErrors DivInstrument::readInsData(SafeReader& reader, short version, DivS
   return readInsDataOld(reader,version);
 }
 
-bool DivInstrument::save(const char* path, bool oldFormat, DivSong* song) {
+bool DivInstrument::save(const char* path, bool oldFormat, DivSong* song, bool writeInsName) {
   SafeWriter* w=new SafeWriter();
   w->init();
 
@@ -3315,14 +3397,14 @@ bool DivInstrument::save(const char* path, bool oldFormat, DivSong* song) {
     // pointer to data
     w->writeI(32);
 
-    // currently reserved (TODO; wavetable and sample here)
+    // reserved
     w->writeS(0);
     w->writeS(0);
     w->writeI(0);
 
     putInsData(w);
   } else {
-    putInsData2(w,true,song);
+    putInsData2(w,true,song,writeInsName);
   }
 
   FILE* outFile=ps_fopen(path,"wb");

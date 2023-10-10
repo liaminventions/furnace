@@ -22,7 +22,6 @@
 
 #include "../dispatch.h"
 #include "sound/vic20sound.h"
-#include <queue>
 
 class DivPlatformVIC20: public DivDispatch {
   struct Channel: public SharedChannel<int> {
@@ -47,6 +46,7 @@ class DivPlatformVIC20: public DivDispatch {
   public:
     void acquire(short** buf, size_t len);
     int dispatch(DivCommand c);
+    bool isVolGlobal();
     void* getChanState(int chan);
     DivMacroInt* getChanMacroInt(int ch);
     DivDispatchOscBuffer* getOscBuffer(int chan);

@@ -32,109 +32,29 @@ these fields are 0 in format versions prior to 100 (0.6pre1).
 
 the format versions are:
 
-- 159: Furnace dev159
+- 181: Furnace 0.6
+- 180: Furnace 0.6pre18
+- 179: Furnace 0.6pre17
+- 178: Furnace 0.6pre16
+- 177: Furnace 0.6pre15
+- 175: Furnace 0.6pre14
+- 174: Furnace 0.6pre13
+- 173: Furnace 0.6pre12
+- 172: Furnace 0.6pre11
+- 171: Furnace 0.6pre10
+- 169: Furnace 0.6pre9
+- 166: Furnace 0.6pre8
+- 162: Furnace 0.6pre7
+- 161: Furnace 0.6pre6
 - 158: Furnace 0.6pre5
-- 157: Furnace dev157
-- 156: Furnace dev156
-- 155: Furnace dev155
-- 154: Furnace dev154
-- 153: Furnace dev153
-- 152: Furnace dev152
-- 151: Furnace dev151
-- 150: Furnace dev150
-- 149: Furnace dev149
-- 148: Furnace dev148
-- 147: Furnace dev147
 - 146: Furnace Pro (joke version)
-- 145: Furnace dev145
-- 144: Furnace dev144
 - 143: Furnace 0.6pre4
-- 142: Furnace dev142
 - 141: Furnace Tournament Edition (for intro tune contest)
-- 140: Furnace dev140
-- 139: Furnace dev139
-- 138: Furnace dev138
-- 137: Furnace dev137
-- 136: Furnace dev136
-- 135: Furnace dev135
-- 134: Furnace dev134
 - 133: Furnace 0.6pre3
 - 132: Furnace 0.6pre2
-- 131: Furnace dev131
-- 130: Furnace dev130
-- 129: Furnace dev129
-- 128: Furnace dev128
-- 127: Furnace dev127
-- 126: Furnace dev126
-- 125: Furnace dev125
-- 124: Furnace dev124
-- 123: Furnace dev123
-- 122: Furnace dev122
-- 121: Furnace dev121
-- 120: Furnace dev120
-- 119: Furnace dev119
-- 118: Furnace dev118
-- 117: Furnace dev117
 - 116: Furnace 0.6pre1.5
-- 115: Furnace dev115
-- 114: Furnace dev114
-- 113: Furnace dev113
-- 112: Furnace dev112
-- 111: Furnace dev111
-- 110: Furnace dev110
-- 109: Furnace dev109
-- 108: Furnace dev108
-- 107: Furnace dev107
-- 106: Furnace dev106
-- 105: Furnace dev105
-- 104: Furnace dev104
-- 103: Furnace dev103
-- 102: Furnace 0.6pre1 (dev102)
-- 101: Furnace 0.6pre1 (dev101)
 - 100: Furnace 0.6pre1
-- 99: Furnace dev99
-- 98: Furnace dev98
-- 97: Furnace dev97
-- 96: Furnace dev96
-- 95: Furnace dev95
-- 94: Furnace dev94
-- 93: Furnace dev93
-- 92: Furnace dev92
-- 91: Furnace dev91
-- 90: Furnace dev90
-- 89: Furnace dev89
-- 88: Furnace dev88
-- 87: Furnace dev87
-- 86: Furnace dev86
-- 85: Furnace dev85
-- 84: Furnace dev84
-- 83: Furnace dev83
-- 82: Furnace dev82
-- 81: Furnace dev81
-- 80: Furnace dev80
-- 79: Furnace dev79
-- 78: Furnace dev78
-- 77: Furnace dev77
-- 76: Furnace dev76
 - 75: Furnace dev75/April Fools' 0.6pre0
-- 74: Furnace dev74
-- 73: Furnace dev73
-- 72: Furnace dev72
-- 71: Furnace dev71
-- 70: Furnace dev70
-- 69: Furnace dev69
-- 68: Furnace dev68
-- 67: Furnace dev67
-- 66: Furnace dev66
-- 65: Furnace dev65
-- 64: Furnace dev64
-- 63: Furnace dev63
-- 62: Furnace dev62
-- 61: Furnace dev61
-- 60: Furnace dev60
-- 59: Furnace dev59
-- 58: Furnace dev58
-- 57: Furnace dev57
 
 - 54: Furnace 0.5.8
 - 53: Furnace 0.5.7
@@ -172,6 +92,8 @@ the format versions are:
 - 14: Furnace 0.2.2
 - 13: Furnace 0.2.1
 - 12: Furnace 0.2
+
+versions that do not appear in this list are `dev???` ones.
 
 # header
 
@@ -233,8 +155,8 @@ size | description
      |   - 0x49: Neo Geo CD extended - 16 channels
      |   - 0x80: AY-3-8910 - 3 channels
      |   - 0x81: Amiga - 4 channels
-     |   - 0x82: YM2151 alone - 8 channels
-     |   - 0x83: YM2612 alone - 6 channels
+     |   - 0x82: YM2151 - 8 channels
+     |   - 0x83: YM2612 - 6 channels
      |   - 0x84: TIA - 2 channels
      |   - 0x85: VIC-20 - 4 channels
      |   - 0x86: PET - 1 channel
@@ -249,7 +171,7 @@ size | description
      |   - 0x8f: OPL (YM3526) - 9 channels
      |   - 0x90: OPL2 (YM3812) - 9 channels
      |   - 0x91: OPL3 (YMF262) - 18 channels
-     |   - 0x92: MultiPCM - 28 channels
+     |   - 0x92: MultiPCM - 28 channels (UNAVAILABLE)
      |   - 0x93: Intel 8253 (beeper) - 1 channel
      |   - 0x94: POKEY - 4 channels
      |   - 0x95: RF5C68 - 8 channels
@@ -277,8 +199,8 @@ size | description
      |   - 0xab: MSM6258 - 1 channel
      |   - 0xac: Commander X16 (VERA) - 17 channels
      |   - 0xad: Bubble System WSG - 2 channels
-     |   - 0xae: OPL4 (YMF278B) - 42 channels
-     |   - 0xaf: OPL4 drums (YMF278B) - 44 channels
+     |   - 0xae: OPL4 (YMF278B) - 42 channels (UNAVAILABLE)
+     |   - 0xaf: OPL4 drums (YMF278B) - 44 channels (UNAVAILABLE)
      |   - 0xb0: Seta/Allumer X1-010 - 16 channels
      |   - 0xb1: Ensoniq ES5506 - 32 channels
      |   - 0xb2: Yamaha Y8950 - 10 channels
@@ -289,24 +211,29 @@ size | description
      |   - 0xb7: YM2608 extended - 19 channels
      |   - 0xb8: YMZ280B - 8 channels
      |   - 0xb9: Namco WSG - 3 channels
-     |   - 0xba: Namco 15xx - 8 channels
-     |   - 0xbb: Namco CUS30 - 8 channels
+     |   - 0xba: Namco C15 - 8 channels
+     |   - 0xbb: Namco C30 - 8 channels
      |   - 0xbc: MSM5232 - 8 channels
-     |   - 0xbd: YM2612 extra features extended - 11 channels
-     |   - 0xbe: YM2612 extra features - 7 channels
+     |   - 0xbd: YM2612 DualPCM extended - 11 channels
+     |   - 0xbe: YM2612 DualPCM - 7 channels
      |   - 0xbf: T6W28 - 4 channels
      |   - 0xc0: PCM DAC - 1 channel
      |   - 0xc1: YM2612 CSM - 10 channels
-     |   - 0xc2: Neo Geo CSM (YM2610) - 18 channels
-     |   - 0xc3: YM2203 CSM - 10 channels
-     |   - 0xc4: YM2608 CSM - 20 channels
-     |   - 0xc5: YM2610B CSM - 20 channels
+     |   - 0xc2: Neo Geo CSM (YM2610) - 18 channels (UNAVAILABLE)
+     |   - 0xc3: YM2203 CSM - 10 channels (UNAVAILABLE)
+     |   - 0xc4: YM2608 CSM - 20 channels (UNAVAILABLE)
+     |   - 0xc5: YM2610B CSM - 20 channels (UNAVAILABLE)
      |   - 0xc6: K007232 - 2 channels
      |   - 0xc7: GA20 - 4 channels
      |   - 0xc8: SM8521 - 3 channels
-     |   - 0xc9: M114S - 16 channels
+     |   - 0xc9: M114S - 16 channels (UNAVAILABLE)
      |   - 0xca: ZX Spectrum (beeper, QuadTone engine) - 5 channels
      |   - 0xcb: Casio PV-1000 - 3 channels
+     |   - 0xcc: K053260 - 4 channels
+     |   - 0xcd: TED - 2 channels
+     |   - 0xce: Namco C140 - 24 channels
+     |   - 0xcf: Namco C219 - 16 channels
+     |   - 0xd0: Namco C352 - 32 channels (UNAVAILABLE)
      |   - 0xde: YM2610B extended - 19 channels
      |   - 0xe0: QSound - 19 channels
      |   - 0xfc: Pong - 1 channel
@@ -315,6 +242,8 @@ size | description
      |   - 0xff: reserved for development
      | - (compound!) means that the system is composed of two or more chips,
      |   and has to be flattened.
+     | - (UNAVAILABLE) means that the chip hasn't been implemented in Furnace
+     |   yet.
  32  | sound chip volumes (<135) or reserved
      | - signed char, 64=1.0, 127=~2.0
      | - as of version 135 these fields only exist for compatibility reasons.
@@ -430,7 +359,8 @@ size | description
  --- | **a couple more compat flags** (>=138)
   1  | broken portamento during legato
   1  | broken macro during note off in some FM chips (>=155)
-  6  | reserved
+  1  | pre note (C64) does not compensate for portamento or legato (>=168)
+  5  | reserved
  --- | **speed pattern of first song** (>=139)
   1  | length of speed pattern (fail if this is lower than 0 or higher than 16)
  16  | speed pattern (this overrides speed 1 and speed 2 settings)

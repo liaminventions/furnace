@@ -21,7 +21,6 @@
 #define _YMZ280B_H
 
 #include "../dispatch.h"
-#include <queue>
 #include "sound/ymz280b.h"
 
 class DivPlatformYMZ280B: public DivDispatch {
@@ -60,6 +59,7 @@ class DivPlatformYMZ280B: public DivDispatch {
     int dispatch(DivCommand c);
     void* getChanState(int chan);
     DivMacroInt* getChanMacroInt(int ch);
+    unsigned short getPan(int chan);
     DivDispatchOscBuffer* getOscBuffer(int chan);
     unsigned char* getRegisterPool();
     int getRegisterPoolSize();
